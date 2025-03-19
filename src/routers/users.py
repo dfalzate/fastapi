@@ -1,21 +1,9 @@
-from typing import List, Optional
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from typing import List
+from fastapi import APIRouter, HTTPException, status
+from common.models.user import User, UserData
+from common.clients.mongo.mongo_client import db
 
 router = APIRouter(prefix="/users", tags=["Users"])
-
-class User(BaseModel):
-  id: int
-  name: str
-  surname: str
-  url: str
-  age: int
-
-class UserData(BaseModel):
-  name: Optional[str] = None
-  surname: Optional[str] = None
-  url: Optional[str] = None
-  age: Optional[int] = None
 
 users = [
   User(
@@ -74,10 +62,13 @@ async def getUserQuery(id:int):
 @router.post("/", response_model=User)
 async def createUser(user:User):
   try:
-    users.append(user)
-    return user
-  except:
-    return {"error":"No se ha encontrado el usuario"}
+    id = db["users"].insert_one(dict(user)).inserted_id
+    response = user.model_dump()
+    response["id"] = str(id)
+    print(response)
+    return response
+  except HTTPException:
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error al crear el usuario")
 
 @router.put("/{userId}", response_model=User)
 async def updateUser(userId:int, userData:UserData):
