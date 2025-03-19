@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+
+from tools.auth import verify, create_token, decode_token
 from .users import User
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
@@ -20,7 +22,7 @@ usersDB = [
     url='url1',
     age=1,
     enabled=True,
-    password='a111'
+    password='$2a$10$CuiY7PYiHA1fJdJu8NZJ8eGzx8D7nZReiqG7i7XIznm.khaoPyQIG'
   ),
   UserDB(
     id=2,
@@ -30,7 +32,7 @@ usersDB = [
     url='url2',
     age=2,
     enabled=True,
-    password='a222'
+    password='$2a$10$TyXMhQiEWaM1Z2Hzla6Tv.HLYPmDKABMm/2e/HnD2qgcUnF2n3cm2'
   )
 ]
 
@@ -42,7 +44,7 @@ async def getUser(email:str):
   return user_list[0]
 
 async def get_current_user(token:str=Depends(oauth2)):
-  user = await getUser(token)
+  user= decode_token(token)
   if not user:
     raise HTTPException(status_code=400, detail='Incorrect email or password')
   return user 
@@ -50,12 +52,12 @@ async def get_current_user(token:str=Depends(oauth2)):
 @router.post('/login')
 async def login(form_data:OAuth2PasswordRequestForm=Depends()):
   user = await getUser(form_data.username)
-  print(user)
   if not user:
     raise HTTPException(status_code=400, detail='Incorrect email or password')
-  if not form_data.password == user.password:
+  if not verify(form_data.password, user.password):
     raise HTTPException(status_code=400, detail='Incorrect email or password')
-  return {'access_token':user.email, 'token_type':'bearer'}
+  
+  return {'access_token':create_token(user.model_dump(exclude={"password"})), 'token_type':'bearer'}
 
 @router.get('/me')
 async def me(user:User=Depends(get_current_user)):
